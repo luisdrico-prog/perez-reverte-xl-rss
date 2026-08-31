@@ -74,6 +74,42 @@ async def dismiss_banners(page) -> None:
         except Exception:
             pass
 
+async def safe_hrefs(page, retries: int = 6) -> list[str]:
+    """
+    Lee los href de la página tolerando navegaciones automáticas de ABC.
+
+    ABC puede redirigir/reconstruir la página justo después de cargar o al
+    cerrar el banner de consentimiento. En ese instante Playwright puede dar:
+    "Execution context was destroyed, most likely because of a navigation".
+    Esperamos a que la navegación termine y reintentamos.
+    """
+    last_error = None
+
+    for attempt in range(1, retries + 1):
+        try:
+            try:
+                await page.wait_for_load_state("domcontentloaded", timeout=12000)
+            except Exception:
+                pass
+
+            await page.wait_for_timeout(700)
+
+            return await page.locator("a[href]").evaluate_all(
+                "(els) => els.map(a => a.href)"
+            )
+
+        except Exception as exc:
+            last_error = exc
+            log(
+                f"Aviso leyendo enlaces (intento {attempt}/{retries}): {exc}"
+            )
+            await page.wait_for_timeout(1200)
+
+    raise RuntimeError(
+        f"No se pudieron leer los enlaces tras {retries} intentos: {last_error}"
+    )
+
+
 async def collect_author_links() -> list[str]:
     first_run = not CATALOG_FILE.exists()
     max_clicks = BACKFILL_CLICKS if first_run else INCREMENTAL_CLICKS
@@ -93,12 +129,17 @@ async def collect_author_links() -> list[str]:
         await page.goto(AUTHOR_URL, wait_until="domcontentloaded", timeout=60000)
         await page.wait_for_timeout(1200)
         await dismiss_banners(page)
+        try:
+            await page.wait_for_load_state("networkidle", timeout=10000)
+        except Exception:
+            pass
+        await page.wait_for_timeout(800)
 
         last_count = -1
         stagnant = 0
 
         for n in range(max_clicks + 1):
-            hrefs = await page.locator("a[href]").evaluate_all("(els) => els.map(a => a.href)")
+            hrefs = await safe_hrefs(page)
             links = {u for h in hrefs if (u := canonical(h))}
             log(f"Enlaces detectados: {len(links)}")
 
@@ -134,7 +175,7 @@ async def collect_author_links() -> list[str]:
             except Exception:
                 break
 
-        hrefs = await page.locator("a[href]").evaluate_all("(els) => els.map(a => a.href)")
+        hrefs = await safe_hrefs(page)
         links = sorted({u for h in hrefs if (u := canonical(h))})
         await browser.close()
 
