@@ -1,0 +1,21 @@
+PÉREZ-REVERTE XLSemanal — RSS PARA FEEDLY
+
+Fuente:
+https://www.abc.es/xlsemanal/firmas/arturo-perez-reverte/
+
+Repositorio recomendado:
+luisdrico-prog/perez-reverte-xl-rss
+
+Subir:
+- update_feed.py
+- requirements.txt
+- .github/workflows/update-feed.yml
+
+Después:
+Actions -> Actualizar RSS Pérez-Reverte XLSemanal -> Run workflow
+
+URL para Feedly:
+https://raw.githubusercontent.com/luisdrico-prog/perez-reverte-xl-rss/main/feed.xml
+
+El feed contiene título, fecha, resumen breve, imagen y enlace al original.
+No copia el cuerpo completo de los artículos.
